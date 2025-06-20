@@ -5,10 +5,9 @@ import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {Test, console2} from 'forge-std/Test.sol';
 
-import {IERC3156FlashBorrower} from '@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol';
-import {Flash} from 'src/Flash.sol';
-import {FlashloanArbitrage} from 'src/FlashloanArbitrage.sol';
 import {IUniswapV2Router02} from 'src/interfaces/uniswap.sol';
+import {FlashloanArbitrage} from 'src/FlashloanArbitrage.sol';
+import {Flash} from 'src/Flash.sol';
 
 contract FlashLoanArbitrageTest is Test {
   uint256 internal constant _FORK_BLOCK = 22_344_656;
@@ -22,11 +21,9 @@ contract FlashLoanArbitrageTest is Test {
   IUniswapV2Router02 internal sushiswapRouter = IUniswapV2Router02(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
   function setUp() public {
-    // Fork the Ethereum mainnet
     vm.createSelectFork(vm.rpcUrl('mainnet'), _FORK_BLOCK);
     governor = makeAddr('governor');
     alice = makeAddr('alice');
-    // Deploy the flash loan contract
     deal(address(dai), alice, 100 ether);
     vm.startPrank(address(governor));
     flash = new Flash(address(dai));
@@ -46,7 +43,6 @@ contract FlashLoanArbitrageTest is Test {
     vm.startPrank(alice);
     dai.approve(address(arb), type(uint256).max);
     dai.transfer(address(arb), 1 ether);
-    // Flash loan
     bytes memory data = abi.encode(address(weth));
     arb.executeArbitrage(address(dai), 1 ether, data);
     arb.withdrawToken(address(dai));
@@ -54,4 +50,55 @@ contract FlashLoanArbitrageTest is Test {
     console2.log(dai.balanceOf(alice));
     vm.stopPrank();
   }
+
+  function test_onFlashLoan_revertsWhenNotFlashLender() public {
+    vm.startPrank(makeAddr("attacker"));
+    vm.expectRevert(FlashloanArbitrage.Unauthorized.selector);
+    arb.onFlashLoan(address(this), address(dai), 1 ether, 0, abi.encode(address(weth)));
+    vm.stopPrank();
+}
+
+function test_onFlashLoan_revertsWhenWrongInitiator() public {
+    vm.startPrank(address(flash));
+    vm.expectRevert(FlashloanArbitrage.Unauthorized.selector);
+    arb.onFlashLoan(makeAddr("wrong"), address(dai), 1 ether, 0, abi.encode(address(weth)));
+    vm.stopPrank();
+}
+
+function test_executeArbitrage_revertsWhenNotOwner() public {
+    address attacker = makeAddr("attacker");
+    vm.startPrank(attacker);
+    vm.expectRevert(FlashloanArbitrage.NotOwner.selector);
+    arb.executeArbitrage(address(dai), 1 ether, abi.encode(address(weth)));
+    vm.stopPrank();
+}
+
+function test_withdrawToken_revertsWhenNotOwner() public {
+    address attacker = makeAddr("attacker");
+    vm.startPrank(attacker);
+    vm.expectRevert(FlashloanArbitrage.NotOwner.selector);
+    arb.withdrawToken(address(dai));
+    vm.stopPrank();
+}
+
+function test_withdrawToken_revertsWhenZeroBalance() public {
+    vm.startPrank(alice);
+    deal(address(dai), address(arb), 0);
+    vm.expectRevert(FlashloanArbitrage.InsufficientBalance.selector);
+    arb.withdrawToken(address(dai));
+    vm.stopPrank();
+}
+
+function test_withdrawToken_worksWithBalance() public {
+    uint256 initialBalance = 1 ether;
+    deal(address(dai), address(arb), initialBalance);
+    
+    vm.startPrank(alice);
+    uint256 ownerBefore = dai.balanceOf(alice);
+    arb.withdrawToken(address(dai));
+    
+    assertEq(dai.balanceOf(address(arb)), 0, "Contract should have 0 balance");
+    assertEq(dai.balanceOf(alice), ownerBefore + initialBalance, "Owner should receive funds");
+    vm.stopPrank();
+}
 }

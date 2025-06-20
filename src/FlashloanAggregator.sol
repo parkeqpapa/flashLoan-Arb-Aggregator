@@ -2,12 +2,10 @@
 pragma solidity ^0.8.13;
 
 import {IERC3156FlashBorrower} from '@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol';
-
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import {Flash} from 'src/Flash.sol';
-
 import {IAAVE} from 'src/interfaces/IAave.sol';
 import {IBalancer} from 'src/interfaces/IBalancer.sol';
+import {Flash} from 'src/Flash.sol';
 
 contract FlashloanAggregator {
   address public owner;
@@ -37,7 +35,7 @@ contract FlashloanAggregator {
 
     uint256 balancerAmount = (totalAmount * BALANCER_PCT) / PCT_BASE;
     uint256 aaveAmount = (totalAmount * AAVE_PCT) / PCT_BASE;
-    uint256 flashLenderAmount = totalAmount - balancerAmount - aaveAmount; 
+    uint256 flashLenderAmount = totalAmount - balancerAmount - aaveAmount;
 
     address[] memory tokens = new address[](1);
     tokens[0] = token;
@@ -58,7 +56,6 @@ contract FlashloanAggregator {
     }
   }
 
- 
   function receiveFlashLoan(
     address[] memory tokens,
     uint256[] memory amounts,

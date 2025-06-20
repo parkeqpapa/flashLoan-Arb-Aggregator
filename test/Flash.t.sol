@@ -57,6 +57,78 @@ contract FlashLoanVaultTest is Test {
     vm.expectRevert();
     flash.flashLoan(attacker, address(usdc), 10, '');
   }
+
+  function test_flashLoan_revertsWhenInsufficientBalance() public {
+    vm.startPrank(user1);
+    uint256 excessiveAmount = usdc.balanceOf(address(flash)) + 1;
+    vm.expectRevert("Insufficient balance");
+    flash.flashLoan(borrower, address(usdc), excessiveAmount, '');
+    vm.stopPrank();
+}
+
+function test_flashLoan_revertsWhenCallbackFails() public {
+    vm.startPrank(user1);
+    BadBorrower badBorrower = new BadBorrower();
+    usdc.transfer(address(badBorrower), 0.0001 ether);
+    
+    vm.expectRevert("Callback failed");
+    flash.flashLoan(badBorrower, address(usdc), 10, '');
+    vm.stopPrank();
+}
+
+function test_flashLoan_transfersCorrectAmounts() public {
+    vm.startPrank(user1);
+    usdc.transfer(address(borrower), 1.1 ether);
+    uint256 initialBalance = usdc.balanceOf(address(flash));
+    uint256 loanAmount = 0.001 ether;
+    uint256 fee = flash.flashFee(address(usdc), loanAmount);
+    
+    flash.flashLoan(borrower, address(usdc), loanAmount, '');
+    
+    uint256 expectedFinalBalance = initialBalance + fee;
+    assertEq(
+        usdc.balanceOf(address(flash)), 
+        expectedFinalBalance,
+        "Contract should end with initial balance + fee"
+    );
+    vm.stopPrank();
+}
+
+function test_flashLoan_zeroAmount() public {
+    vm.startPrank(user1);
+    usdc.transfer(address(borrower), 1.1 ether);
+    flash.flashLoan(borrower, address(usdc), 0, '');
+    vm.stopPrank();
+}
+
+function test_flashLoan_maxAmount() public {
+    vm.startPrank(user1);
+    uint256 maxAmount = flash.maxFlashLoan(address(usdc));
+    usdc.transfer(address(borrower), flash.flashFee(address(usdc), maxAmount));
+    flash.flashLoan(borrower, address(usdc), maxAmount, '');
+    vm.stopPrank();
+}
+
+function test_maxFlashLoan_returnsZeroForNonSupportedToken() public view {
+    address randomToken = address(0x123);
+    uint256 maxLoan = flash.maxFlashLoan(randomToken);
+    assertEq(maxLoan, 0, "Should return 0 for non-supported token");
+}
+
+function test_maxFlashLoan_returnsCorrectBalanceForSupportedToken() public view {
+    uint256 contractBalance = usdc.balanceOf(address(flash));
+    uint256 maxLoan = flash.maxFlashLoan(address(usdc));
+    assertEq(maxLoan, contractBalance, "Should return full balance for supported token");
+}
+
+}
+
+contract MockUSDC is ERC20 {
+  constructor() ERC20('USDC', 'USDC') {}
+
+  function mint(address to, uint256 amount) public {
+    _mint(to, amount);
+  }
 }
 
 contract MockFlashLoanReceiver is IERC3156FlashBorrower, Test {
@@ -75,19 +147,11 @@ contract MockFlashLoanReceiver is IERC3156FlashBorrower, Test {
     uint256 fee,
     bytes calldata data
   ) external returns (bytes32) {
-    // Perform your logic here
     IERC20(token).approve(msg.sender, type(uint256).max);
     return keccak256('ERC3156FlashBorrower.onFlashLoan');
   }
 }
 
-contract MockUSDC is ERC20 {
-  constructor() ERC20('USDC', 'USDC') {}
-
-  function mint(address to, uint256 amount) public {
-    _mint(to, amount);
-  }
-}
 
 contract FlashLoanAttacker is IERC3156FlashBorrower {
   constructor() {}
@@ -99,8 +163,18 @@ contract FlashLoanAttacker is IERC3156FlashBorrower {
     uint256 fee,
     bytes calldata data
   ) external override returns (bytes32) {
-    // try to send the loan to ourselves
     IERC20(token).transfer(initiator, amount + fee);
     return keccak256('IERC3156FlashBorrower.onFlashLoan');
   }
+}
+contract BadBorrower is IERC3156FlashBorrower {
+    function onFlashLoan(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external pure returns (bytes32) {
+        return keccak256("WrongSelector"); 
+    }
 }

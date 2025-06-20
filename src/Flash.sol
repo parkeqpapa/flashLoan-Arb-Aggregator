@@ -35,18 +35,15 @@ contract Flash is IERC3156FlashLender {
   ) external returns (bool) {
     require(IERC20(token).balanceOf(address(this)) >= amount, 'Insufficient balance');
 
-    // Transfer the tokens to the borrower
     IERC20(token).transfer(address(receiver), amount);
     uint256 fee = flashFee(tokenAddress, amount);
 
-    // Call the borrower's callback function
     require(
       receiver.onFlashLoan(msg.sender, address(token), amount, fee, data)
         == keccak256('ERC3156FlashBorrower.onFlashLoan'),
       'Callback failed'
     );
 
-    // Transfer the fee back to the lender
     IERC20(token).transferFrom(address(receiver), address(this), amount + fee);
 
     return true;
