@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import {Test, console2} from 'forge-std/Test.sol';
+import {Test} from 'forge-std/Test.sol';
 
 import {IUniswapV2Router02} from 'src/interfaces/uniswap.sol';
 import {FlashloanArbitrage} from 'src/FlashloanArbitrage.sol';
 import {Flash} from 'src/Flash.sol';
 
 contract FlashLoanArbitrageTest is Test {
-  uint256 internal constant _FORK_BLOCK = 22_344_656;
-  address internal governor;
-  address internal alice;
-  Flash internal flash;
-  FlashloanArbitrage internal arb;
-  IERC20 internal dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-  IERC20 internal weth = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-  IUniswapV2Router02 internal uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-  IUniswapV2Router02 internal sushiswapRouter = IUniswapV2Router02(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+  uint256 public constant FORK_BLOCK = 22_344_656;
+  address public governor;
+  address public alice;
+  Flash public flash;
+  FlashloanArbitrage public arb;
+  IERC20 public dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+  IERC20 public weth = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+  IUniswapV2Router02 public uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+  IUniswapV2Router02 public sushiswapRouter = IUniswapV2Router02(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('mainnet'), _FORK_BLOCK);
+    vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
     governor = makeAddr('governor');
     alice = makeAddr('alice');
     deal(address(dai), alice, 100 ether);
@@ -36,7 +35,7 @@ contract FlashLoanArbitrageTest is Test {
     deal(address(dai), address(flash), 100 ether);
   }
 
-  function test_flashLoan() public {
+  function testFlashLoan() public {
     vm.startPrank(address(arb));
     dai.approve(address(flash), type(uint256).max);
     vm.stopPrank();
@@ -47,25 +46,25 @@ contract FlashLoanArbitrageTest is Test {
     arb.executeArbitrage(address(dai), 1 ether, data);
     arb.withdrawToken(address(dai));
     assertEq(dai.balanceOf(address(arb)), 0);
-    console2.log(dai.balanceOf(alice));
+    // console2.log(dai.balanceOf(alice));
     vm.stopPrank();
   }
 
-  function test_onFlashLoan_revertsWhenNotFlashLender() public {
+  function testOnFlashLoanRevertsWhenNotFlashLender() public {
     vm.startPrank(makeAddr("attacker"));
     vm.expectRevert(FlashloanArbitrage.Unauthorized.selector);
     arb.onFlashLoan(address(this), address(dai), 1 ether, 0, abi.encode(address(weth)));
     vm.stopPrank();
 }
 
-function test_onFlashLoan_revertsWhenWrongInitiator() public {
+function testOnFlashLoanRevertsWhenWrongInitiator() public {
     vm.startPrank(address(flash));
     vm.expectRevert(FlashloanArbitrage.Unauthorized.selector);
     arb.onFlashLoan(makeAddr("wrong"), address(dai), 1 ether, 0, abi.encode(address(weth)));
     vm.stopPrank();
 }
 
-function test_executeArbitrage_revertsWhenNotOwner() public {
+function testExecuteArbitrageRevertsWhenNotOwner() public {
     address attacker = makeAddr("attacker");
     vm.startPrank(attacker);
     vm.expectRevert(FlashloanArbitrage.NotOwner.selector);
@@ -73,7 +72,7 @@ function test_executeArbitrage_revertsWhenNotOwner() public {
     vm.stopPrank();
 }
 
-function test_withdrawToken_revertsWhenNotOwner() public {
+function testWithdrawTokenRevertsWhenNotOwner() public {
     address attacker = makeAddr("attacker");
     vm.startPrank(attacker);
     vm.expectRevert(FlashloanArbitrage.NotOwner.selector);
@@ -81,7 +80,7 @@ function test_withdrawToken_revertsWhenNotOwner() public {
     vm.stopPrank();
 }
 
-function test_withdrawToken_revertsWhenZeroBalance() public {
+function testWithdrawTokenRevertsWhenZeroBalance() public {
     vm.startPrank(alice);
     deal(address(dai), address(arb), 0);
     vm.expectRevert(FlashloanArbitrage.InsufficientBalance.selector);
@@ -89,7 +88,7 @@ function test_withdrawToken_revertsWhenZeroBalance() public {
     vm.stopPrank();
 }
 
-function test_withdrawToken_worksWithBalance() public {
+function testWithdrawTokenWorksWithBalance() public {
     uint256 initialBalance = 1 ether;
     deal(address(dai), address(arb), initialBalance);
     

@@ -9,26 +9,26 @@ import {IERC3156FlashBorrower} from '@openzeppelin/contracts/interfaces/IERC3156
 import {Flash} from 'src/Flash.sol';
 
 contract FlashLoanVaultTest is Test {
-  address OwnerWallet;
-  address user1;
-  address user2;
-  address user3;
-  Flash flash;
-  MockFlashLoanReceiver borrower;
-  MockUSDC usdc;
+  address public ownerWallet;
+  address public user1;
+  address public user2;
+  address public user3;
+  Flash public flash;
+  MockFlashLoanReceiver public borrower;
+  MockUSDC public usdc;
 
   function setUp() public {
-    OwnerWallet = makeAddr('OwnerWallet');
+    ownerWallet = makeAddr('OwnerWallet');
     user1 = makeAddr('user1');
     user2 = makeAddr('user2');
 
     usdc = new MockUSDC();
     usdc.mint(user1, 10 ether);
     usdc.mint(user2, 10 ether);
-    usdc.mint(OwnerWallet, 10 ether);
+    usdc.mint(ownerWallet, 10 ether);
     flash = new Flash(address(usdc));
 
-    vm.startPrank(OwnerWallet);
+    vm.startPrank(ownerWallet);
     usdc.approve(address(flash), type(uint256).max);
     usdc.transfer(address(flash), 10 ether);
     vm.stopPrank();
@@ -37,20 +37,20 @@ contract FlashLoanVaultTest is Test {
     borrower = new MockFlashLoanReceiver(address(flash));
     // console2.log(address(borrower).balance);
     // console2.log(usdc.balanceOf(address(borrower)));
-    console2.log(usdc.balanceOf(address(flash)));
+    // console2.log(usdc.balanceOf(address(flash)));
     vm.stopPrank();
   }
 
-  function test_flashLoan() public {
+  function testflashLoan() public {
     vm.startPrank(user1);
     usdc.transfer(address(borrower), 0.0001 ether);
     flash.flashLoan(borrower, address(usdc), 10, '');
     assertEq(usdc.balanceOf(address(flash)), 10.0001 ether);
     assertEq(usdc.balanceOf(address(borrower)), 0);
-    console2.log(usdc.balanceOf(address(borrower)));
+    // console2.log(usdc.balanceOf(address(borrower)));
   }
 
-  function test_revert_loan_repay_failed() public {
+  function testRevertLoanRepayFailed() public {
     vm.startPrank(user1);
     FlashLoanAttacker attacker = new FlashLoanAttacker();
     usdc.transfer(address(attacker), 0.1 ether);
@@ -58,7 +58,7 @@ contract FlashLoanVaultTest is Test {
     flash.flashLoan(attacker, address(usdc), 10, '');
   }
 
-  function test_flashLoan_revertsWhenInsufficientBalance() public {
+  function testFlashLoanRevertsWhenInsufficientBalance() public {
     vm.startPrank(user1);
     uint256 excessiveAmount = usdc.balanceOf(address(flash)) + 1;
     vm.expectRevert("Insufficient balance");
@@ -66,7 +66,7 @@ contract FlashLoanVaultTest is Test {
     vm.stopPrank();
 }
 
-function test_flashLoan_revertsWhenCallbackFails() public {
+function testFlashLoanRevertsWhenCallbackFails() public {
     vm.startPrank(user1);
     BadBorrower badBorrower = new BadBorrower();
     usdc.transfer(address(badBorrower), 0.0001 ether);
@@ -76,7 +76,7 @@ function test_flashLoan_revertsWhenCallbackFails() public {
     vm.stopPrank();
 }
 
-function test_flashLoan_transfersCorrectAmounts() public {
+function testFlashLoanTransfersCorrectAmounts() public {
     vm.startPrank(user1);
     usdc.transfer(address(borrower), 1.1 ether);
     uint256 initialBalance = usdc.balanceOf(address(flash));
@@ -94,14 +94,14 @@ function test_flashLoan_transfersCorrectAmounts() public {
     vm.stopPrank();
 }
 
-function test_flashLoan_zeroAmount() public {
+function testFlashLoanZeroAmount() public {
     vm.startPrank(user1);
     usdc.transfer(address(borrower), 1.1 ether);
     flash.flashLoan(borrower, address(usdc), 0, '');
     vm.stopPrank();
 }
 
-function test_flashLoan_maxAmount() public {
+function testFlashLoanMaxAmount() public {
     vm.startPrank(user1);
     uint256 maxAmount = flash.maxFlashLoan(address(usdc));
     usdc.transfer(address(borrower), flash.flashFee(address(usdc), maxAmount));
@@ -109,13 +109,13 @@ function test_flashLoan_maxAmount() public {
     vm.stopPrank();
 }
 
-function test_maxFlashLoan_returnsZeroForNonSupportedToken() public view {
+function testMaxFlashLoanReturnsZeroForNonSupportedToken() public view {
     address randomToken = address(0x123);
     uint256 maxLoan = flash.maxFlashLoan(randomToken);
     assertEq(maxLoan, 0, "Should return 0 for non-supported token");
 }
 
-function test_maxFlashLoan_returnsCorrectBalanceForSupportedToken() public view {
+function testMaxFlashLoanReturnsCorrectBalanceForSupportedToken() public view {
     uint256 contractBalance = usdc.balanceOf(address(flash));
     uint256 maxLoan = flash.maxFlashLoan(address(usdc));
     assertEq(maxLoan, contractBalance, "Should return full balance for supported token");

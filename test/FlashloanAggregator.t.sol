@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import {Test, console2} from 'forge-std/Test.sol';
+import {Test} from 'forge-std/Test.sol';
 
 import {Flash} from 'src/Flash.sol';
 import {FlashloanAggregator} from 'src/FlashloanAggregator.sol';
@@ -26,11 +26,11 @@ interface IAAVE {
     ) external;
 }
 contract FlashloanAggregatorTest is Test {
-  address internal governor;
-  address balancer = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
-  address aave = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
-  IERC20 dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-  FlashloanAggregator internal aggregator;
+  address public governor;
+  address public balancer = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+  address public aave = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
+  IERC20 public dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+  FlashloanAggregator public aggregator;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), 22_344_656);
@@ -49,7 +49,7 @@ contract FlashloanAggregatorTest is Test {
     vm.stopPrank();
   }
 
-  function test_flashLoanMultiple() public {
+  function testFlashLoanMultiple() public {
     vm.startPrank(governor);
     dai.approve(address(aggregator), type(uint256).max);
     deal(address(dai), address(aggregator), 100 ether);
@@ -59,14 +59,14 @@ contract FlashloanAggregatorTest is Test {
   }
 
 
-  function test_flashLoanMultiple_revertsWhenAmountZero() public {
+  function testFlashLoanMultipleRevertsWhenAmountZero() public {
     vm.startPrank(governor);
     vm.expectRevert("Amount must be > 0");
     aggregator.flashLoanMultiple(0, address(dai), '');
     vm.stopPrank();
 }
 
-function test_approveTokens_worksWithPartialAmounts() public {
+function testApproveTokensWorksWithPartialAmounts() public {
     vm.startPrank(governor);
     uint256 amount = 1000;
     aggregator.approveTokens(address(dai), amount);
@@ -77,13 +77,13 @@ function test_approveTokens_worksWithPartialAmounts() public {
     vm.stopPrank();
 }
 
-function test_approveTokens_withoutAuthorization() public {
+function testApproveTokensWithoutAuthorization() public {
     vm.expectRevert('Only owner');
     aggregator.approveTokens(address(dai), 1000);
     vm.stopPrank();
 }
 
-function test_flashLoanMultiple_worksWithOnlyBalancer() public {
+function testFlashLoanMultipleWorksWithOnlyBalancer() public {
     vm.startPrank(governor);
     dai.approve(address(aggregator), type(uint256).max);
     deal(address(dai), address(aggregator), 100 ether);
@@ -99,7 +99,7 @@ function test_flashLoanMultiple_worksWithOnlyBalancer() public {
     vm.stopPrank();
 }
 
-function test_flashLoanMultiple_worksWithOnlyAave() public {
+function testFlashLoanMultipleWorksWithOnlyAave() public {
     vm.startPrank(governor);
     dai.approve(address(aggregator), type(uint256).max);
     deal(address(dai), address(aggregator), 100 ether);
@@ -116,7 +116,7 @@ function test_flashLoanMultiple_worksWithOnlyAave() public {
 }
 
 
-function test_receiveFlashLoan_revertsWhenNotBalancer() public {
+function testReceiveFlashLoanRevertsWhenNotBalancer() public {
     vm.startPrank(makeAddr("attacker"));
     address[] memory tokens = new address[](1);
     uint256[] memory amounts = new uint256[](1);
@@ -126,28 +126,28 @@ function test_receiveFlashLoan_revertsWhenNotBalancer() public {
     vm.stopPrank();
 }
 
-function test_executeOperation_revertsWhenNotAave() public {
+function testExecuteOperationRevertsWhenNotAave() public {
     vm.startPrank(makeAddr("attacker"));
     vm.expectRevert("Only Aave");
     aggregator.executeOperation(address(dai), 1 ether, 0, address(this), '');
     vm.stopPrank();
 }
 
-function test_executeOperation_revertsWhenWrongInitiator() public {
+function testExecuteOperationRevertsWhenWrongInitiator() public {
     vm.startPrank(aave);
     vm.expectRevert("Unauthorized");
     aggregator.executeOperation(address(dai), 1 ether, 0, makeAddr("wrong"), '');
     vm.stopPrank();
 }
 
-function test_onFlashLoan_revertsWhenNotFlashLender() public {
+function testOnFlashLoanRevertsWhenNotFlashLender() public {
     vm.startPrank(makeAddr("attacker"));
     vm.expectRevert("Only Flash Lender");
     aggregator.onFlashLoan(address(this), address(dai), 1 ether, 0, '');
     vm.stopPrank();
 }
 
-function test_onFlashLoan_revertsWhenWrongInitiator() public {
+function testOnFlashLoanRevertsWhenWrongInitiator() public {
     vm.startPrank(address(aggregator.flashLenderAddress()));
     vm.expectRevert("Unauthorized");
     aggregator.onFlashLoan(makeAddr("wrong"), address(dai), 1 ether, 0, '');
